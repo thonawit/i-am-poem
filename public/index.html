@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>I Am Poem</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <h1>I Am Poem</h1>
+    <p class="subtitle">Same prompt, any model — see who writes it best.</p>
+
+    <section id="key-section">
+      <label for="api-key">Ollama API key</label>
+      <div class="row">
+        <input id="api-key" type="password" placeholder="Paste your Ollama API key" autocomplete="off" />
+        <button id="save-key">Save</button>
+      </div>
+      <p class="hint">Saved to a local <code>.env</code> file on this machine. Never sent anywhere but Ollama.</p>
+      <p id="key-status" class="status"></p>
+    </section>
+
+    <form id="poem-form">
+      <label for="subject">What is the subject of your poem?</label>
+      <input id="subject" required />
+
+      <label for="style">What type of style?</label>
+      <select id="style" required></select>
+
+      <label for="context">Context (optional)</label>
+      <textarea id="context" rows="3"></textarea>
+
+      <label for="model">Model</label>
+      <select id="model" required></select>
+
+      <button id="generate" type="submit">Generate</button>
+    </form>
+
+    <section id="output" class="output hidden">
+      <h2 id="output-title"></h2>
+      <pre id="output-poem"></pre>
+      <p id="output-model" class="status"></p>
+    </section>
+
+    <p id="error" class="error hidden"></p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

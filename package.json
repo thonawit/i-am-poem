@@ -1,0 +1,41 @@
+{
+  "name": "i-am-poem",
+  "version": "1.0.0",
+  "description": "Generate poems from any Ollama cloud model, side by side, from the same prompt",
+  "author": "Mike Worley",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "electron:build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.mikeworley.i-am-poem",
+    "productName": "I Am Poem",
+    "directories": {
+      "output": "release"
+    },
+    "asar": false,
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "public/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "I Am Poem"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}
