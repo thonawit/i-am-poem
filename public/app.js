@@ -19,6 +19,7 @@ const output = document.getElementById('output');
 const outputTitle = document.getElementById('output-title');
 const outputPoem = document.getElementById('output-poem');
 const outputModel = document.getElementById('output-model');
+const outputUsage = document.getElementById('output-usage');
 const errorEl = document.getElementById('error');
 
 const PROVIDER_LABEL = { ollama: 'Ollama', openrouter: 'OpenRouter' };
@@ -149,6 +150,12 @@ form.addEventListener('submit', async (e) => {
     outputTitle.textContent = data.title;
     outputPoem.textContent = data.poem;
     outputModel.textContent = `Written by ${data.model} via ${PROVIDER_LABEL[data.provider] || data.provider}`;
+
+    const tokenParts = [];
+    if (data.totalTokens != null) tokenParts.push(`${data.totalTokens} tokens`);
+    if (data.cost != null) tokenParts.push(`$${data.cost}`);
+    outputUsage.textContent = tokenParts.join(' · ');
+
     output.classList.remove('hidden');
   } catch (err) {
     showError(err.message);

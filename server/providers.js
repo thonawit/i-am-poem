@@ -60,7 +60,13 @@ async function generateWithOllama({ subject, style, context, model, apiKey }) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error || `ollama.com/api/chat returned ${res.status}`);
-  return parsePoemResponse(data?.message?.content || '');
+  return {
+    ...parsePoemResponse(data?.message?.content || ''),
+    promptTokens: data?.prompt_eval_count ?? null,
+    completionTokens: data?.eval_count ?? null,
+    totalTokens: (data?.prompt_eval_count ?? 0) + (data?.eval_count ?? 0) || null,
+    cost: null, // Ollama's API doesn't report a dollar cost
+  };
 }
 
 async function generateWithOpenRouter({ subject, style, context, model, apiKey }) {
@@ -78,13 +84,19 @@ async function generateWithOpenRouter({ subject, style, context, model, apiKey }
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error?.message || `openrouter.ai returned ${res.status}`);
-  return parsePoemResponse(data?.choices?.[0]?.message?.content || '');
+  return {
+    ...parsePoemResponse(data?.choices?.[0]?.message?.content || ''),
+    promptTokens: data?.usage?.prompt_tokens ?? null,
+    completionTokens: data?.usage?.completion_tokens ?? null,
+    totalTokens: data?.usage?.total_tokens ?? null,
+    cost: data?.usage?.cost ?? null,
+  };
 }
 
 async function generatePoem({ provider, subject, style, context, model, apiKey }) {
   const generator = provider === 'openrouter' ? generateWithOpenRouter : generateWithOllama;
-  const { title, poem } = await generator({ subject, style, context, model, apiKey });
-  return { title, poem, model, provider };
+  const result = await generator({ subject, style, context, model, apiKey });
+  return { ...result, model, provider };
 }
 
 module.exports = { fetchAllModels, generatePoem };

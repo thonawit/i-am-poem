@@ -69,15 +69,7 @@ function createServer(envPath, poemsDir) {
         if (!apiKey) return sendJson(res, 400, { error: `No API key saved for ${provider} yet` });
 
         const result = await generatePoem({ provider, subject, style, context, model, apiKey });
-        savePoem(poemsDir, {
-          subject,
-          style,
-          context,
-          provider,
-          model,
-          title: result.title,
-          poem: result.poem,
-        });
+        savePoem(poemsDir, { subject, style, context, ...result });
         return sendJson(res, 200, result);
       }
 

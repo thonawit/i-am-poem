@@ -29,6 +29,10 @@ cliché density, and how well each one actually follows the style you asked for.
 - **One file per poem** — every generation is saved to a `poems/` folder with the
   subject, style, context, provider, model, title, and poem text, so you can build
   up a real archive to compare across runs.
+- **Token and cost tracking** — every result shows prompt/completion/total token
+  counts, plus the actual dollar cost when using OpenRouter (Ollama's API doesn't
+  report cost, so that field reads `n/a`). Saved to each poem's file too, so you
+  can weigh "best poem" against "best poem per dollar."
 - **No server to run yourself** — it talks directly to each provider's cloud API,
   so there's no local Ollama install required.
 
