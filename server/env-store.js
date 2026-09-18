@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
+const KEY_NAMES = {
+  ollama: 'OLLAMA_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+};
+
 function readEnvFile(envPath) {
   if (!fs.existsSync(envPath)) return {};
   const out = {};
@@ -22,14 +27,18 @@ function writeEnvFile(envPath, values) {
   fs.writeFileSync(envPath, body + '\n', 'utf8');
 }
 
-function getApiKey(envPath) {
-  return readEnvFile(envPath).OLLAMA_API_KEY || '';
+function getApiKey(envPath, provider) {
+  const varName = KEY_NAMES[provider];
+  if (!varName) throw new Error(`Unknown provider: ${provider}`);
+  return readEnvFile(envPath)[varName] || '';
 }
 
-function setApiKey(envPath, key) {
+function setApiKey(envPath, provider, key) {
+  const varName = KEY_NAMES[provider];
+  if (!varName) throw new Error(`Unknown provider: ${provider}`);
   const values = readEnvFile(envPath);
-  values.OLLAMA_API_KEY = key;
+  values[varName] = key;
   writeEnvFile(envPath, values);
 }
 
-module.exports = { getApiKey, setApiKey };
+module.exports = { getApiKey, setApiKey, PROVIDERS: Object.keys(KEY_NAMES) };

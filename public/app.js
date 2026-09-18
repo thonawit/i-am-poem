@@ -1,12 +1,18 @@
-const keyInput = document.getElementById('api-key');
-const saveKeyBtn = document.getElementById('save-key');
-const keyStatus = document.getElementById('key-status');
+const keyInputs = {
+  ollama: document.getElementById('ollama-key'),
+  openrouter: document.getElementById('openrouter-key'),
+};
+const keyStatuses = {
+  ollama: document.getElementById('ollama-key-status'),
+  openrouter: document.getElementById('openrouter-key-status'),
+};
 
 const form = document.getElementById('poem-form');
 const subjectInput = document.getElementById('subject');
 const styleSelect = document.getElementById('style');
 const contextInput = document.getElementById('context');
 const modelSelect = document.getElementById('model');
+const modelProviderHint = document.getElementById('model-provider-hint');
 const generateBtn = document.getElementById('generate');
 
 const output = document.getElementById('output');
@@ -14,6 +20,8 @@ const outputTitle = document.getElementById('output-title');
 const outputPoem = document.getElementById('output-poem');
 const outputModel = document.getElementById('output-model');
 const errorEl = document.getElementById('error');
+
+const PROVIDER_LABEL = { ollama: 'Ollama', openrouter: 'OpenRouter' };
 
 function showError(message) {
   errorEl.textContent = message;
@@ -24,12 +32,14 @@ function clearError() {
   errorEl.classList.add('hidden');
 }
 
-async function loadKey() {
-  const res = await fetch('/api/key');
+async function loadKeys() {
+  const res = await fetch('/api/keys');
   const data = await res.json();
-  if (data.hasKey) {
-    keyInput.value = data.key;
-    keyStatus.textContent = 'Key loaded from saved .env file.';
+  for (const provider of Object.keys(keyInputs)) {
+    if (data[provider]?.hasKey) {
+      keyInputs[provider].value = data[provider].key;
+      keyStatuses[provider].textContent = 'Key loaded from saved .env file.';
+    }
   }
 }
 
@@ -41,37 +51,77 @@ async function loadStyles() {
     .join('');
 }
 
+function optionValue(provider, id) {
+  return `${provider}::${id}`;
+}
+
+function parseOptionValue(value) {
+  const [provider, ...rest] = value.split('::');
+  return { provider, id: rest.join('::') };
+}
+
 async function loadModels() {
   modelSelect.innerHTML = '<option>Loading models…</option>';
   try {
     const res = await fetch('/api/models');
-    const data = await res.json();
-    modelSelect.innerHTML = data.models.map((m) => `<option value="${m}">${m}</option>`).join('');
+    const { ollama, openrouter } = await res.json();
+
+    const groups = [];
+    if (ollama.length) {
+      groups.push(
+        `<optgroup label="Ollama">${ollama
+          .map((m) => `<option value="${optionValue('ollama', m.id)}">${m.label}</option>`)
+          .join('')}</optgroup>`
+      );
+    }
+    if (openrouter.length) {
+      groups.push(
+        `<optgroup label="OpenRouter">${openrouter
+          .map((m) => `<option value="${optionValue('openrouter', m.id)}">${m.label}</option>`)
+          .join('')}</optgroup>`
+      );
+    }
+    modelSelect.innerHTML = groups.join('') || '<option value="">No models available</option>';
+    updateProviderHint();
   } catch (err) {
     modelSelect.innerHTML = '<option value="">Failed to load models</option>';
     showError(`Could not load model list: ${err.message}`);
   }
 }
 
-saveKeyBtn.addEventListener('click', async () => {
-  const key = keyInput.value.trim();
-  if (!key) return;
-  saveKeyBtn.disabled = true;
-  try {
-    const res = await fetch('/api/key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-    });
-    if (!res.ok) throw new Error((await res.json()).error);
-    keyStatus.textContent = 'Key saved.';
-    clearError();
-  } catch (err) {
-    showError(`Could not save key: ${err.message}`);
-  } finally {
-    saveKeyBtn.disabled = false;
+function updateProviderHint() {
+  if (!modelSelect.value) {
+    modelProviderHint.textContent = '';
+    return;
   }
-});
+  const { provider } = parseOptionValue(modelSelect.value);
+  modelProviderHint.textContent = `Runs via ${PROVIDER_LABEL[provider] || provider}.`;
+}
+
+modelSelect.addEventListener('change', updateProviderHint);
+
+for (const provider of Object.keys(keyInputs)) {
+  document.getElementById(`save-${provider}-key`).addEventListener('click', async (e) => {
+    const key = keyInputs[provider].value.trim();
+    if (!key) return;
+    const btn = e.target;
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, key }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      keyStatuses[provider].textContent = 'Key saved.';
+      clearError();
+    } catch (err) {
+      showError(`Could not save ${PROVIDER_LABEL[provider]} key: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -81,6 +131,7 @@ form.addEventListener('submit', async (e) => {
   generateBtn.textContent = 'Generating…';
 
   try {
+    const { provider, id } = parseOptionValue(modelSelect.value);
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -88,7 +139,8 @@ form.addEventListener('submit', async (e) => {
         subject: subjectInput.value.trim(),
         style: styleSelect.value,
         context: contextInput.value.trim(),
-        model: modelSelect.value,
+        provider,
+        model: id,
       }),
     });
     const data = await res.json();
@@ -96,7 +148,7 @@ form.addEventListener('submit', async (e) => {
 
     outputTitle.textContent = data.title;
     outputPoem.textContent = data.poem;
-    outputModel.textContent = `Written by ${data.model}`;
+    outputModel.textContent = `Written by ${data.model} via ${PROVIDER_LABEL[data.provider] || data.provider}`;
     output.classList.remove('hidden');
   } catch (err) {
     showError(err.message);
@@ -106,6 +158,6 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-loadKey();
+loadKeys();
 loadStyles();
 loadModels();

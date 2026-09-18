@@ -1,9 +1,10 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { STYLE_OPTIONS, buildPrompt, parsePoemResponse } = require('./prompt');
-const { getApiKey, setApiKey } = require('./env-store');
+const { STYLE_OPTIONS } = require('./prompt');
+const { getApiKey, setApiKey, PROVIDERS } = require('./env-store');
 const { savePoem } = require('./poem-archive');
+const { fetchAllModels, generatePoem } = require('./providers');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript' };
@@ -29,36 +30,6 @@ function readBody(req) {
   });
 }
 
-async function fetchCloudModels() {
-  const res = await fetch('https://ollama.com/api/tags');
-  if (!res.ok) throw new Error(`ollama.com/api/tags returned ${res.status}`);
-  const data = await res.json();
-  return data.models.map((m) => m.name).sort();
-}
-
-async function generatePoem({ subject, style, context, model, apiKey }) {
-  const prompt = buildPrompt({ subject, style, context });
-  const res = await fetch('https://ollama.com/api/chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      stream: false,
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data?.error || `ollama.com/api/chat returned ${res.status}`);
-  }
-  const raw = data?.message?.content || '';
-  const { title, poem } = parsePoemResponse(raw);
-  return { title, poem, model };
-}
-
 function createServer(envPath, poemsDir) {
   return http.createServer(async (req, res) => {
     try {
@@ -67,31 +38,46 @@ function createServer(envPath, poemsDir) {
       }
 
       if (req.method === 'GET' && req.url === '/api/models') {
-        const models = await fetchCloudModels();
-        return sendJson(res, 200, { models });
+        const models = await fetchAllModels();
+        return sendJson(res, 200, models);
       }
 
-      if (req.method === 'GET' && req.url === '/api/key') {
-        const key = getApiKey(envPath);
-        return sendJson(res, 200, { hasKey: !!key, key });
+      if (req.method === 'GET' && req.url === '/api/keys') {
+        const keys = {};
+        for (const provider of PROVIDERS) {
+          const key = getApiKey(envPath, provider);
+          keys[provider] = { hasKey: !!key, key };
+        }
+        return sendJson(res, 200, keys);
       }
 
-      if (req.method === 'POST' && req.url === '/api/key') {
-        const { key } = await readBody(req);
+      if (req.method === 'POST' && req.url === '/api/keys') {
+        const { provider, key } = await readBody(req);
+        if (!PROVIDERS.includes(provider)) return sendJson(res, 400, { error: 'Unknown provider' });
         if (!key) return sendJson(res, 400, { error: 'Missing key' });
-        setApiKey(envPath, key);
+        setApiKey(envPath, provider, key);
         return sendJson(res, 200, { ok: true });
       }
 
       if (req.method === 'POST' && req.url === '/api/generate') {
-        const { subject, style, context, model } = await readBody(req);
-        const apiKey = getApiKey(envPath);
-        if (!apiKey) return sendJson(res, 400, { error: 'No Ollama API key saved yet' });
+        const { subject, style, context, provider, model } = await readBody(req);
+        if (!PROVIDERS.includes(provider)) return sendJson(res, 400, { error: 'Unknown provider' });
         if (!subject || !style || !model) {
           return sendJson(res, 400, { error: 'subject, style, and model are required' });
         }
-        const result = await generatePoem({ subject, style, context, model, apiKey });
-        savePoem(poemsDir, { subject, style, context, model, title: result.title, poem: result.poem });
+        const apiKey = getApiKey(envPath, provider);
+        if (!apiKey) return sendJson(res, 400, { error: `No API key saved for ${provider} yet` });
+
+        const result = await generatePoem({ provider, subject, style, context, model, apiKey });
+        savePoem(poemsDir, {
+          subject,
+          style,
+          context,
+          provider,
+          model,
+          title: result.title,
+          poem: result.poem,
+        });
         return sendJson(res, 200, result);
       }
 
