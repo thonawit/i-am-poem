@@ -61,12 +61,14 @@ function createServer(envPath, poemsDir) {
 
       if (req.method === 'POST' && req.url === '/api/generate') {
         const { subject, style, context, provider, model } = await readBody(req);
-        if (!PROVIDERS.includes(provider)) return sendJson(res, 400, { error: 'Unknown provider' });
+        // Anthropic runs on the local Claude Code login, so it needs no saved key.
+        const keyless = provider === 'anthropic';
+        if (!keyless && !PROVIDERS.includes(provider)) return sendJson(res, 400, { error: 'Unknown provider' });
         if (!subject || !style || !model) {
           return sendJson(res, 400, { error: 'subject, style, and model are required' });
         }
-        const apiKey = getApiKey(envPath, provider);
-        if (!apiKey) return sendJson(res, 400, { error: `No API key saved for ${provider} yet` });
+        const apiKey = keyless ? null : getApiKey(envPath, provider);
+        if (!keyless && !apiKey) return sendJson(res, 400, { error: `No API key saved for ${provider} yet` });
 
         const result = await generatePoem({ provider, subject, style, context, model, apiKey });
         savePoem(poemsDir, { subject, style, context, ...result });

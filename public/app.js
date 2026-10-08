@@ -22,7 +22,7 @@ const outputModel = document.getElementById('output-model');
 const outputUsage = document.getElementById('output-usage');
 const errorEl = document.getElementById('error');
 
-const PROVIDER_LABEL = { ollama: 'Ollama', openrouter: 'OpenRouter' };
+const PROVIDER_LABEL = { ollama: 'Ollama', openrouter: 'OpenRouter', anthropic: 'Claude Code (Max plan)' };
 
 function showError(message) {
   errorEl.textContent = message;
@@ -65,9 +65,16 @@ async function loadModels() {
   modelSelect.innerHTML = '<option>Loading models…</option>';
   try {
     const res = await fetch('/api/models');
-    const { ollama, openrouter } = await res.json();
+    const { ollama, openrouter, anthropic = [] } = await res.json();
 
     const groups = [];
+    if (anthropic.length) {
+      groups.push(
+        `<optgroup label="Anthropic (Max plan)">${anthropic
+          .map((m) => `<option value="${optionValue('anthropic', m.id)}">${m.label}</option>`)
+          .join('')}</optgroup>`
+      );
+    }
     if (ollama.length) {
       groups.push(
         `<optgroup label="Ollama">${ollama
@@ -153,7 +160,7 @@ form.addEventListener('submit', async (e) => {
 
     const tokenParts = [];
     if (data.totalTokens != null) tokenParts.push(`${data.totalTokens} tokens`);
-    if (data.cost != null) tokenParts.push(`$${data.cost}`);
+    if (data.cost != null) tokenParts.push(data.maxPlan ? `$${data.cost} API-equivalent, billed to Max` : `$${data.cost}`);
     outputUsage.textContent = tokenParts.join(' · ');
 
     output.classList.remove('hidden');
